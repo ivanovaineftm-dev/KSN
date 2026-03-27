@@ -15,7 +15,7 @@ COLUMN_F = 6
 COLUMN_G = 7
 COLUMN_H = 8
 TARGET_ROLE = "стажер"
-INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="80FF0000", end_color="80FF0000")
+INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_color="FFFFC7CE")
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
@@ -94,6 +94,17 @@ def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
     return normalized_mentor_role in allowed_mentor_roles
 
 
+def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object) -> bool:
+    """Return True when row violates mentor validation rules.
+
+    Validation rules:
+    - mentor role (column F) cannot be empty;
+    - for "повар-стажер" (column C), mentor role (column F)
+      must be one of: "повар", "повар-универсал".
+    """
+    return _is_blank(mentor_role) or not _mentor_role_is_valid(trainee_role, mentor_role)
+
+
 def _paint_row(sheet, row_idx: int, max_column: int) -> None:
     for column_idx in range(1, max_column + 1):
         sheet.cell(row=row_idx, column=column_idx).fill = INVALID_ROW_FILL
@@ -129,11 +140,7 @@ def process_excel(input_path: Path, output_path: Path) -> None:
                 rows_to_delete.append(row_idx)
                 continue
 
-            if (
-                _is_blank(h_value)
-                or _is_blank(f_value)
-                or not _mentor_role_is_valid(c_value, f_value)
-            ):
+            if _is_blank(h_value) or _row_has_mentor_validation_error(c_value, f_value):
                 rows_to_highlight.append(row_idx)
 
         for row_idx in rows_to_highlight:
