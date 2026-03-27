@@ -6,6 +6,7 @@ import re
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 
 HEADER_ROW = 1
@@ -13,6 +14,20 @@ COLUMN_C = 3
 COLUMN_G = 7
 COLUMN_H = 8
 TARGET_ROLE = "стажер"
+INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="80FF0000", end_color="80FF0000")
+
+MENTOR_ROLE_RULES: dict[str, set[str]] = {
+    "бариста-стажер": {"бариста"},
+    "кассир-стажер": {"кассир", "старший кассир", "повар-универсал"},
+    "повар-стажер": {"повар-универсал", "повар"},
+    "повар-универсал стажер": {"повар-универсал", "повар", "старший кассир", "кассир"},
+    "работник торгового зала-стажер": {
+        "кассир",
+        "старший кассир",
+        "работник торгового зала",
+        "повар-универсал",
+    },
+}
 
 
 def _is_blank(value: object) -> bool:
@@ -47,6 +62,42 @@ def _contains_target_role(value: object) -> bool:
     return TARGET_ROLE in normalized_text
 
 
+def _normalize_role(value: object) -> str:
+    if _is_blank(value):
+        return ""
+
+    return (
+        str(value)
+        .strip()
+        .lower()
+        .replace("ё", "е")
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace(" - ", "-")
+        .replace("- ", "-")
+        .replace(" -", "-")
+        .replace("  ", " ")
+    )
+
+
+def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
+    normalized_trainee_role = _normalize_role(trainee_role)
+    allowed_mentor_roles = MENTOR_ROLE_RULES.get(normalized_trainee_role)
+    if not allowed_mentor_roles:
+        return True
+
+    normalized_mentor_role = _normalize_role(mentor_role)
+    if not normalized_mentor_role:
+        return False
+
+    return normalized_mentor_role in allowed_mentor_roles
+
+
+def _paint_row(sheet, row_idx: int, max_column: int) -> None:
+    for column_idx in range(1, max_column + 1):
+        sheet.cell(row=row_idx, column=column_idx).fill = INVALID_ROW_FILL
+
+
 def process_excel(input_path: Path, output_path: Path) -> None:
     """Process every sheet and remove rows by filtering rules.
 
@@ -54,12 +105,14 @@ def process_excel(input_path: Path, output_path: Path) -> None:
     1) Keep rows only if column C contains "стажер".
     2) Remove rows if column G is empty.
     3) Remove rows if column G contains "февраль".
-    4) Remove rows if column H is empty.
+    4) Fill row red if column H is empty.
+    5) Fill row red if mentor role does not match trainee role rules.
     """
     workbook = load_workbook(input_path)
 
     for sheet in workbook.worksheets:
         rows_to_delete: list[int] = []
+        rows_to_highlight: list[int] = []
         for row_idx in range(sheet.max_row, HEADER_ROW, -1):
             c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
             g_value = sheet.cell(row=row_idx, column=COLUMN_G).value
@@ -69,9 +122,15 @@ def process_excel(input_path: Path, output_path: Path) -> None:
                 not _contains_target_role(c_value)
                 or _is_blank(g_value)
                 or _contains_february(g_value)
-                or _is_blank(h_value)
             ):
                 rows_to_delete.append(row_idx)
+                continue
+
+            if _is_blank(h_value) or not _mentor_role_is_valid(c_value, h_value):
+                rows_to_highlight.append(row_idx)
+
+        for row_idx in rows_to_highlight:
+            _paint_row(sheet, row_idx, sheet.max_column)
 
         for row_idx in rows_to_delete:
             sheet.delete_rows(row_idx, 1)
