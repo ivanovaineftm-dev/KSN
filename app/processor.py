@@ -11,6 +11,7 @@ from openpyxl.styles import PatternFill
 
 HEADER_ROW = 1
 COLUMN_C = 3
+COLUMN_F = 6
 COLUMN_G = 7
 COLUMN_H = 8
 TARGET_ROLE = "стажер"
@@ -106,7 +107,8 @@ def process_excel(input_path: Path, output_path: Path) -> None:
     2) Remove rows if column G is empty.
     3) Remove rows if column G contains "февраль".
     4) Fill row red if column H is empty.
-    5) Fill row red if mentor role does not match trainee role rules.
+    5) Fill row red if mentor role in column F is empty.
+    6) Fill row red if mentor role in column F does not match trainee role rules.
     """
     workbook = load_workbook(input_path)
 
@@ -116,6 +118,7 @@ def process_excel(input_path: Path, output_path: Path) -> None:
         for row_idx in range(sheet.max_row, HEADER_ROW, -1):
             c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
             g_value = sheet.cell(row=row_idx, column=COLUMN_G).value
+            f_value = sheet.cell(row=row_idx, column=COLUMN_F).value
             h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
 
             if (
@@ -126,7 +129,11 @@ def process_excel(input_path: Path, output_path: Path) -> None:
                 rows_to_delete.append(row_idx)
                 continue
 
-            if _is_blank(h_value) or not _mentor_role_is_valid(c_value, h_value):
+            if (
+                _is_blank(h_value)
+                or _is_blank(f_value)
+                or not _mentor_role_is_valid(c_value, f_value)
+            ):
                 rows_to_highlight.append(row_idx)
 
         for row_idx in rows_to_highlight:
