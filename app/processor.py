@@ -9,8 +9,20 @@ from openpyxl import load_workbook
 
 
 HEADER_ROW = 1
+COLUMN_C = 3
 COLUMN_G = 7
 COLUMN_H = 8
+EXCLUDED_ROLES = (
+    "бариста",
+    "кассир",
+    "повар",
+    "повар-универсал",
+    "практикант",
+    "работник торгового зала",
+    "уборщик",
+    "директор",
+    "старший кассир",
+)
 
 
 def _is_blank(value: object) -> bool:
@@ -35,23 +47,40 @@ def _contains_february(value: object) -> bool:
     return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
 
 
+def _contains_excluded_role(value: object) -> bool:
+    if _is_blank(value):
+        return False
+
+    value_text = str(value).strip().lower().replace("ё", "е")
+    normalized_text = value_text.replace("–", "-").replace("—", "-")
+
+    return any(role in normalized_text for role in EXCLUDED_ROLES)
+
+
 def process_excel(input_path: Path, output_path: Path) -> None:
     """Process every sheet and remove rows by filtering rules.
 
     Rules:
-    1) Remove rows if column G is empty.
-    2) Remove rows if column G contains "февраль".
-    3) Remove rows if column H is empty.
+    1) Remove rows if column C contains one of excluded role names.
+    2) Remove rows if column G is empty.
+    3) Remove rows if column G contains "февраль".
+    4) Remove rows if column H is empty.
     """
     workbook = load_workbook(input_path)
 
     for sheet in workbook.worksheets:
         rows_to_delete: list[int] = []
         for row_idx in range(sheet.max_row, HEADER_ROW, -1):
+            c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
             g_value = sheet.cell(row=row_idx, column=COLUMN_G).value
             h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
 
-            if _is_blank(g_value) or _contains_february(g_value) or _is_blank(h_value):
+            if (
+                _contains_excluded_role(c_value)
+                or _is_blank(g_value)
+                or _contains_february(g_value)
+                or _is_blank(h_value)
+            ):
                 rows_to_delete.append(row_idx)
 
         for row_idx in rows_to_delete:
