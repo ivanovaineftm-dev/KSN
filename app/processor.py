@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from pathlib import Path
+import re
 
 import pandas as pd
 from openpyxl import load_workbook
@@ -22,7 +24,15 @@ def _is_blank(value: object) -> bool:
 def _contains_february(value: object) -> bool:
     if _is_blank(value):
         return False
-    return "феврал" in str(value).lower()
+
+    if isinstance(value, (datetime, date)):
+        return value.month == 2
+
+    value_text = str(value).strip().lower()
+    if "феврал" in value_text:
+        return True
+
+    return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
 
 
 def process_excel(input_path: Path, output_path: Path) -> None:
