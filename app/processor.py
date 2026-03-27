@@ -20,6 +20,7 @@ INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_co
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
     "кассир-стажер": {"кассир", "старший кассир", "повар-универсал"},
+    "старший кассир-стажер": {"старший кассир", "заместитель директора"},
     "повар-стажер": {"повар-универсал", "повар"},
     "повар-универсал стажер": {"повар-универсал", "повар", "старший кассир", "кассир"},
     "работник торгового зала-стажер": {
@@ -99,8 +100,8 @@ def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object) 
 
     Validation rules:
     - mentor role (column F) cannot be empty;
-    - for "повар-стажер" (column C), mentor role (column F)
-      must be one of: "повар", "повар-универсал".
+    - for supported trainee roles (column C), mentor role (column F)
+      must match role-specific allowed values.
     """
     return _is_blank(mentor_role) or not _mentor_role_is_valid(trainee_role, mentor_role)
 
@@ -117,7 +118,7 @@ def process_excel(input_path: Path, output_path: Path) -> None:
     1) Keep rows only if column C contains "стажер".
     2) Remove rows if column G is empty.
     3) Remove rows if column G contains "февраль".
-    4) Fill row red if column H is empty.
+    4) Remove rows if column H is empty.
     5) Fill row red if mentor role in column F is empty.
     6) Fill row red if mentor role in column F does not match trainee role rules.
     """
@@ -136,11 +137,12 @@ def process_excel(input_path: Path, output_path: Path) -> None:
                 not _contains_target_role(c_value)
                 or _is_blank(g_value)
                 or _contains_february(g_value)
+                or _is_blank(h_value)
             ):
                 rows_to_delete.append(row_idx)
                 continue
 
-            if _is_blank(h_value) or _row_has_mentor_validation_error(c_value, f_value):
+            if _row_has_mentor_validation_error(c_value, f_value):
                 rows_to_highlight.append(row_idx)
 
         for row_idx in rows_to_highlight:
