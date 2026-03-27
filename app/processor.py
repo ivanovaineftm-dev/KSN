@@ -12,17 +12,7 @@ HEADER_ROW = 1
 COLUMN_C = 3
 COLUMN_G = 7
 COLUMN_H = 8
-EXCLUDED_ROLES = (
-    "бариста",
-    "кассир",
-    "повар",
-    "повар-универсал",
-    "практикант",
-    "работник торгового зала",
-    "уборщик",
-    "директор",
-    "старший кассир",
-)
+TARGET_ROLE = "стажер"
 
 
 def _is_blank(value: object) -> bool:
@@ -47,21 +37,21 @@ def _contains_february(value: object) -> bool:
     return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
 
 
-def _contains_excluded_role(value: object) -> bool:
+def _contains_target_role(value: object) -> bool:
     if _is_blank(value):
         return False
 
     value_text = str(value).strip().lower().replace("ё", "е")
     normalized_text = value_text.replace("–", "-").replace("—", "-")
 
-    return any(role in normalized_text for role in EXCLUDED_ROLES)
+    return TARGET_ROLE in normalized_text
 
 
 def process_excel(input_path: Path, output_path: Path) -> None:
     """Process every sheet and remove rows by filtering rules.
 
     Rules:
-    1) Remove rows if column C contains one of excluded role names.
+    1) Keep rows only if column C contains "стажер".
     2) Remove rows if column G is empty.
     3) Remove rows if column G contains "февраль".
     4) Remove rows if column H is empty.
@@ -76,7 +66,7 @@ def process_excel(input_path: Path, output_path: Path) -> None:
             h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
 
             if (
-                _contains_excluded_role(c_value)
+                not _contains_target_role(c_value)
                 or _is_blank(g_value)
                 or _contains_february(g_value)
                 or _is_blank(h_value)
