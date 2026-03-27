@@ -1,18 +1,34 @@
 from __future__ import annotations
 
-from datetime import date, datetime
 from pathlib import Path
-import re
 
 import pandas as pd
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 
 HEADER_ROW = 1
-COLUMN_C = 3
-COLUMN_G = 7
-COLUMN_H = 8
-TARGET_ROLE = "стажер"
+TRAINEE_ROLE_COLUMN = 3
+MENTOR_ROLE_COLUMN = 8
+ROW_HIGHLIGHT_FILL = PatternFill(fill_type="solid", fgColor="80FF0000")
+
+ALLOWED_MENTOR_ROLES_BY_TRAINEE_ROLE = {
+    "бариста-стажер": {"бариста"},
+    "кассир-стажер": {"кассир", "старший кассир", "повар-универсал"},
+    "повар-стажер": {"повар-универсал", "повар"},
+    "повар-универсал стажер": {
+        "повар-универсал",
+        "повар",
+        "старший кассир",
+        "кассир",
+    },
+    "работник торгового зала-стажер": {
+        "кассир",
+        "старший кассир",
+        "работник торгового зала",
+        "повар-универсал",
+    },
+}
 
 
 def _is_blank(value: object) -> bool:
@@ -23,58 +39,51 @@ def _is_blank(value: object) -> bool:
     return False
 
 
-def _contains_february(value: object) -> bool:
+def _normalize_role(value: object) -> str:
     if _is_blank(value):
+        return ""
+
+    return (
+        str(value)
+        .strip()
+        .lower()
+        .replace("ё", "е")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
+
+
+def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
+    normalized_trainee_role = _normalize_role(trainee_role)
+    normalized_mentor_role = _normalize_role(mentor_role)
+
+    if normalized_mentor_role == "":
         return False
 
-    if isinstance(value, (datetime, date)):
-        return value.month == 2
-
-    value_text = str(value).strip().lower()
-    if "феврал" in value_text:
+    allowed_mentor_roles = ALLOWED_MENTOR_ROLES_BY_TRAINEE_ROLE.get(normalized_trainee_role)
+    if allowed_mentor_roles is None:
         return True
 
-    return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
-
-
-def _contains_target_role(value: object) -> bool:
-    if _is_blank(value):
-        return False
-
-    value_text = str(value).strip().lower().replace("ё", "е")
-    normalized_text = value_text.replace("–", "-").replace("—", "-")
-
-    return TARGET_ROLE in normalized_text
+    return normalized_mentor_role in allowed_mentor_roles
 
 
 def process_excel(input_path: Path, output_path: Path) -> None:
-    """Process every sheet and remove rows by filtering rules.
+    """Highlight rows with invalid mentor position rules.
 
-    Rules:
-    1) Keep rows only if column C contains "стажер".
-    2) Remove rows if column G is empty.
-    3) Remove rows if column G contains "февраль".
-    4) Remove rows if column H is empty.
+    Row is highlighted in semi-transparent red when:
+    1) Mentor role column is empty.
+    2) For configured trainee roles, mentor role is outside the allowed list.
     """
     workbook = load_workbook(input_path)
 
     for sheet in workbook.worksheets:
-        rows_to_delete: list[int] = []
-        for row_idx in range(sheet.max_row, HEADER_ROW, -1):
-            c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
-            g_value = sheet.cell(row=row_idx, column=COLUMN_G).value
-            h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
+        for row_idx in range(HEADER_ROW + 1, sheet.max_row + 1):
+            trainee_role = sheet.cell(row=row_idx, column=TRAINEE_ROLE_COLUMN).value
+            mentor_role = sheet.cell(row=row_idx, column=MENTOR_ROLE_COLUMN).value
 
-            if (
-                not _contains_target_role(c_value)
-                or _is_blank(g_value)
-                or _contains_february(g_value)
-                or _is_blank(h_value)
-            ):
-                rows_to_delete.append(row_idx)
-
-        for row_idx in rows_to_delete:
-            sheet.delete_rows(row_idx, 1)
+            if not _mentor_role_is_valid(trainee_role=trainee_role, mentor_role=mentor_role):
+                for col_idx in range(1, sheet.max_column + 1):
+                    sheet.cell(row=row_idx, column=col_idx).fill = ROW_HIGHLIGHT_FILL
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     workbook.save(output_path)
