@@ -125,12 +125,11 @@
 <body>
   <div class="container">
     <h1>Обработка Excel-файлов</h1>
-    <p>Загрузите основной Excel-файл и при необходимости справочник "Локации". Поддерживаются форматы .xlsx и .xls. Сервис обработает данные, выполнит сопоставление подразделений и вернёт итоговый .xlsx файл.</p>
+    <p>Загрузите .xlsx файл. Сервис удалит строки по заданным правилам, вернёт обработанный файл и построит аналитику качества по подразделениям.</p>
 
     <form id="upload-form">
       <div class="row">
-        <input id="main-file-input" type="file" accept=".xlsx,.xls" required />
-        <input id="locations-file-input" type="file" accept=".xlsx,.xls" />
+        <input id="file-input" type="file" accept=".xlsx" required />
         <button id="submit-btn" type="submit">Обработать и скачать</button>
       </div>
       <div id="status" class="status"></div>
