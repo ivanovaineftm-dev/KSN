@@ -1,5 +1,6 @@
 const form = document.getElementById('upload-form');
-const fileInput = document.getElementById('file-input');
+const mainFileInput = document.getElementById('main-file-input');
+const locationsFileInput = document.getElementById('locations-file-input');
 const submitBtn = document.getElementById('submit-btn');
 const statusNode = document.getElementById('status');
 const analyticsSection = document.getElementById('analytics-section');
@@ -71,9 +72,11 @@ async function downloadProcessedFile(downloadUrl, filename) {
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
 
-  const file = fileInput.files?.[0];
-  if (!file) {
-    setStatus('Выберите файл перед загрузкой.', 'error');
+  const mainFile = mainFileInput.files?.[0];
+  const locationsFile = locationsFileInput.files?.[0];
+
+  if (!mainFile || !locationsFile) {
+    setStatus('Выберите основной файл и файл "Локации" перед загрузкой.', 'error');
     return;
   }
 
@@ -82,7 +85,8 @@ form.addEventListener('submit', async (event) => {
 
   try {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('main_file', mainFile);
+    formData.append('locations_file', locationsFile);
 
     const response = await fetch('/upload', {
       method: 'POST',
@@ -97,9 +101,9 @@ form.addEventListener('submit', async (event) => {
 
     const payload = await response.json();
     renderAnalytics(payload.analytics || []);
-    await downloadProcessedFile(payload.download_url, payload.filename || `processed_${file.name}`);
+    await downloadProcessedFile(payload.download_url, payload.filename || `processed_${mainFile.name}`);
 
-    setStatus('Готово! Обработанный файл скачан, аналитика построена.', 'ok');
+    setStatus('Готово! Файлы обработаны, подразделения сопоставлены, результат скачан.', 'ok');
   } catch (error) {
     setStatus(error.message || 'Произошла ошибка.', 'error');
   } finally {

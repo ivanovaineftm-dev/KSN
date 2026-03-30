@@ -26,21 +26,36 @@ def index() -> HTMLResponse:
     return HTMLResponse((TEMPLATES_DIR / "index.html").read_text(encoding="utf-8"))
 
 
+ALLOWED_EXTENSIONS = (".xlsx", ".xls")
+
+
 @app.post("/upload")
-async def upload_excel(file: UploadFile = File(...)) -> dict[str, str | list[dict[str, int | str]]]:
-    filename = file.filename or "uploaded.xlsx"
-    if not filename.lower().endswith(".xlsx"):
-        raise HTTPException(status_code=400, detail="Можно загружать только .xlsx файлы")
+async def upload_excel(
+    main_file: UploadFile = File(...),
+    locations_file: UploadFile = File(...),
+) -> dict[str, str | list[dict[str, int | str]]]:
+    main_filename = main_file.filename or "uploaded.xlsx"
+    locations_filename = locations_file.filename or "locations.xlsx"
+    if not main_filename.lower().endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail="Основной файл должен быть в формате .xlsx или .xls")
+    if not locations_filename.lower().endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail='Файл "Локации" должен быть в формате .xlsx или .xls')
 
     token = uuid4().hex
-    input_path = UPLOAD_DIR / f"{token}_{filename}"
-    output_name = f"processed_{filename}"
+    input_path = UPLOAD_DIR / f"{token}_main_{main_filename}"
+    locations_path = UPLOAD_DIR / f"{token}_locations_{locations_filename}"
+    output_name = f"processed_{Path(main_filename).stem}.xlsx"
     output_path = PROCESSED_DIR / f"{token}_{output_name}"
 
-    data = await file.read()
-    input_path.write_bytes(data)
+    input_data = await main_file.read()
+    locations_data = await locations_file.read()
+    input_path.write_bytes(input_data)
+    locations_path.write_bytes(locations_data)
 
-    analytics = process_excel(input_path=input_path, output_path=output_path)
+    try:
+        analytics = process_excel(input_path=input_path, locations_path=locations_path, output_path=output_path)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
         "download_url": f"/download/{token}/{output_name}",
