@@ -12,8 +12,8 @@
       color: #222;
     }
     .container {
-      max-width: 640px;
-      margin: 80px auto;
+      max-width: 960px;
+      margin: 48px auto;
       padding: 24px;
       background: #fff;
       border-radius: 12px;
@@ -63,12 +63,69 @@
     .status.ok {
       color: #166534;
     }
+    .analytics {
+      margin-top: 28px;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 22px;
+    }
+    .analytics h2 {
+      margin: 0 0 14px;
+      font-size: 22px;
+    }
+    .analytics-empty {
+      color: #666;
+      margin: 0;
+    }
+    .chart {
+      display: flex;
+      gap: 14px;
+      align-items: flex-end;
+      min-height: 320px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+    }
+    .bar-item {
+      min-width: 72px;
+      max-width: 96px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 6px;
+      flex: 1;
+    }
+    .bar-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e3a8a;
+    }
+    .bar-wrap {
+      height: 240px;
+      border: 1px solid #dbeafe;
+      border-radius: 8px;
+      display: flex;
+      align-items: flex-end;
+      padding: 3px;
+      background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
+    }
+    .bar {
+      width: 100%;
+      border-radius: 6px;
+      background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+      transition: height 0.35s ease;
+    }
+    .bar-label {
+      font-size: 12px;
+      line-height: 1.2;
+      color: #334155;
+      word-break: break-word;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Обработка Excel-файлов</h1>
-    <p>Загрузите .xlsx файл. Сервис удалит строки по заданным правилам и вернёт обработанный файл.</p>
+    <p>Загрузите .xlsx файл. Сервис удалит строки по заданным правилам, вернёт обработанный файл и построит аналитику качества по подразделениям.</p>
 
     <form id="upload-form">
       <div class="row">
@@ -77,6 +134,12 @@
       </div>
       <div id="status" class="status"></div>
     </form>
+
+    <section id="analytics-section" class="analytics" hidden>
+      <h2>Качество по подразделениям</h2>
+      <p id="analytics-empty" class="analytics-empty" hidden>Нет данных по подразделениям (пустые значения в столбце D игнорируются).</p>
+      <div id="analytics-chart" class="chart"></div>
+    </section>
   </div>
 
   <script src="/static/app.js"></script>

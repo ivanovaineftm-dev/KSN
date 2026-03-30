@@ -27,7 +27,7 @@ def index() -> HTMLResponse:
 
 
 @app.post("/upload")
-async def upload_excel(file: UploadFile = File(...)) -> FileResponse:
+async def upload_excel(file: UploadFile = File(...)) -> dict[str, str | list[dict[str, int | str]]]:
     filename = file.filename or "uploaded.xlsx"
     if not filename.lower().endswith(".xlsx"):
         raise HTTPException(status_code=400, detail="Можно загружать только .xlsx файлы")
@@ -40,10 +40,23 @@ async def upload_excel(file: UploadFile = File(...)) -> FileResponse:
     data = await file.read()
     input_path.write_bytes(data)
 
-    process_excel(input_path=input_path, output_path=output_path)
+    analytics = process_excel(input_path=input_path, output_path=output_path)
+
+    return {
+        "download_url": f"/download/{token}/{output_name}",
+        "filename": output_name,
+        "analytics": analytics,
+    }
+
+
+@app.get("/download/{token}/{filename}")
+def download_processed(token: str, filename: str) -> FileResponse:
+    output_path = PROCESSED_DIR / f"{token}_{filename}"
+    if not output_path.exists():
+        raise HTTPException(status_code=404, detail="Файл не найден")
 
     return FileResponse(
         output_path,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        filename=output_name,
+        filename=filename,
     )
