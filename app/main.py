@@ -3,6 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
+from typing import Annotated
+
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -31,33 +33,37 @@ ALLOWED_EXTENSIONS = (".xlsx", ".xls")
 
 @app.post("/upload")
 async def upload_excel(
-    main_file: UploadFile = File(...),
-    locations_file: UploadFile = File(...),
-    barista_file: UploadFile = File(...),
+    main_file: Annotated[UploadFile, File(...)],
+    locations_file: Annotated[UploadFile | None, File()] = None,
+    barista_file: Annotated[UploadFile | None, File()] = None,
 ) -> dict[str, str | list[dict[str, int | str]]]:
     main_filename = main_file.filename or "uploaded.xlsx"
-    locations_filename = locations_file.filename or "locations.xlsx"
-    barista_filename = barista_file.filename or "barista.xlsx"
+    locations_filename = (locations_file.filename or "locations.xlsx") if locations_file else None
+    barista_filename = (barista_file.filename or "barista.xlsx") if barista_file else None
     if not main_filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Основной файл должен быть в формате .xlsx или .xls")
-    if not locations_filename.lower().endswith(ALLOWED_EXTENSIONS):
+    if locations_filename and not locations_filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail='Файл "Локации" должен быть в формате .xlsx или .xls')
-    if not barista_filename.lower().endswith(ALLOWED_EXTENSIONS):
+    if barista_filename and not barista_filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail='Файл "Должность" должен быть в формате .xlsx или .xls')
 
     token = uuid4().hex
     input_path = UPLOAD_DIR / f"{token}_main_{main_filename}"
-    locations_path = UPLOAD_DIR / f"{token}_locations_{locations_filename}"
-    barista_path = UPLOAD_DIR / f"{token}_barista_{barista_filename}"
+    locations_path = UPLOAD_DIR / f"{token}_locations_{locations_filename}" if locations_filename else None
+    barista_path = UPLOAD_DIR / f"{token}_barista_{barista_filename}" if barista_filename else None
     output_name = f"processed_{Path(main_filename).stem}.xlsx"
     output_path = PROCESSED_DIR / f"{token}_{output_name}"
 
     input_data = await main_file.read()
-    locations_data = await locations_file.read()
-    barista_data = await barista_file.read()
     input_path.write_bytes(input_data)
-    locations_path.write_bytes(locations_data)
-    barista_path.write_bytes(barista_data)
+
+    if locations_file and locations_path:
+        locations_data = await locations_file.read()
+        locations_path.write_bytes(locations_data)
+
+    if barista_file and barista_path:
+        barista_data = await barista_file.read()
+        barista_path.write_bytes(barista_data)
 
     try:
         analytics = process_excel(
