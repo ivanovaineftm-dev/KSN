@@ -30,7 +30,20 @@
     .row {
       display: flex;
       gap: 12px;
+      align-items: stretch;
+      flex-wrap: wrap;
+    }
+    .file-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 230px;
+      flex: 1;
+    }
+    .file-controls {
+      display: flex;
       align-items: center;
+      gap: 8px;
       flex-wrap: wrap;
     }
     input[type='file'] {
@@ -38,6 +51,15 @@
       border: 1px solid #ccc;
       border-radius: 8px;
       background: #fff;
+      max-width: 100%;
+    }
+    .file-name {
+      font-size: 12px;
+      color: #475569;
+    }
+    .secondary-btn {
+      background: #e2e8f0;
+      color: #1f2937;
     }
     button {
       padding: 10px 16px;
@@ -125,22 +147,37 @@
 <body>
   <div class="container">
     <h1>Обработка Excel-файлов</h1>
-    <p>Загрузите основной Excel-файл, файл &laquo;Локации&raquo; и файл &laquo;Должность&raquo; (.xlsx или .xls). Сервис обработает данные, выполнит сопоставление подразделений, вернёт обработанный файл и построит аналитику качества.</p>
+    <p>Загрузите основной Excel-файл (.xlsx или .xls). Файлы &laquo;Локации&raquo; и &laquo;Должность&raquo; можно добавить при необходимости: если их нет, сервис выполнит обработку настолько, насколько это возможно без вспомогательных файлов.</p>
 
     <form id="upload-form">
       <div class="row">
-        <label>
-          Основной файл:
-          <input id="main-file-input" type="file" accept=".xlsx,.xls" required />
-        </label>
-        <label>
-          Файл &laquo;Локации&raquo;:
-          <input id="locations-file-input" type="file" accept=".xlsx,.xls" required />
-        </label>
-        <label>
-          Файл &laquo;Должность&raquo;:
-          <input id="barista-file-input" type="file" accept=".xlsx,.xls" required />
-        </label>
+        <div class="file-group">
+          <label for="main-file-input">Основной файл:</label>
+          <div class="file-controls">
+            <input id="main-file-input" type="file" accept=".xlsx,.xls" required />
+            <button class="secondary-btn" type="button" onclick="clearFile('main-file-input', 'main-file-name')">Очистить</button>
+          </div>
+          <span id="main-file-name" class="file-name">Файл не выбран</span>
+        </div>
+
+        <div class="file-group">
+          <label for="locations-file-input">Файл &laquo;Локации&raquo; (необязательно):</label>
+          <div class="file-controls">
+            <input id="locations-file-input" type="file" accept=".xlsx,.xls" />
+            <button class="secondary-btn" type="button" onclick="clearFile('locations-file-input', 'locations-file-name')">Очистить</button>
+          </div>
+          <span id="locations-file-name" class="file-name">Файл не выбран</span>
+        </div>
+
+        <div class="file-group">
+          <label for="barista-file-input">Файл &laquo;Должность&raquo; (необязательно):</label>
+          <div class="file-controls">
+            <input id="barista-file-input" type="file" accept=".xlsx,.xls" />
+            <button class="secondary-btn" type="button" onclick="clearFile('barista-file-input', 'barista-file-name')">Очистить</button>
+          </div>
+          <span id="barista-file-name" class="file-name">Файл не выбран</span>
+        </div>
+
         <button id="submit-btn" type="submit">Обработать и скачать</button>
       </div>
       <div id="status" class="status"></div>

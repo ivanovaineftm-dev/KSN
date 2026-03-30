@@ -13,6 +13,26 @@ function setStatus(message, type = '') {
   statusNode.className = `status ${type}`.trim();
 }
 
+function clearFile(inputId, nameId) {
+  const input = document.getElementById(inputId);
+  const nameNode = document.getElementById(nameId);
+  input.value = '';
+  nameNode.textContent = 'Файл не выбран';
+}
+
+function bindFileName(inputId, nameId) {
+  const input = document.getElementById(inputId);
+  const nameNode = document.getElementById(nameId);
+  input.addEventListener('change', () => {
+    const fileName = input.files?.[0]?.name;
+    nameNode.textContent = fileName || 'Файл не выбран';
+  });
+}
+
+bindFileName('main-file-input', 'main-file-name');
+bindFileName('locations-file-input', 'locations-file-name');
+bindFileName('barista-file-input', 'barista-file-name');
+
 function renderAnalytics(analytics) {
   analyticsChart.innerHTML = '';
 
@@ -77,8 +97,8 @@ form.addEventListener('submit', async (event) => {
   const locationsFile = locationsFileInput.files?.[0];
   const baristaFile = baristaFileInput.files?.[0];
 
-  if (!mainFile || !locationsFile || !baristaFile) {
-    setStatus('Выберите основной файл, файл "Локации" и файл "Должность" перед загрузкой.', 'error');
+  if (!mainFile) {
+    setStatus('Выберите основной файл перед загрузкой.', 'error');
     return;
   }
 
@@ -88,8 +108,12 @@ form.addEventListener('submit', async (event) => {
   try {
     const formData = new FormData();
     formData.append('main_file', mainFile);
-    formData.append('locations_file', locationsFile);
-    formData.append('barista_file', baristaFile);
+    if (locationsFile) {
+      formData.append('locations_file', locationsFile);
+    }
+    if (baristaFile) {
+      formData.append('barista_file', baristaFile);
+    }
 
     const response = await fetch('/upload', {
       method: 'POST',
@@ -106,10 +130,12 @@ form.addEventListener('submit', async (event) => {
     renderAnalytics(payload.analytics || []);
     await downloadProcessedFile(payload.download_url, payload.filename || `processed_${mainFile.name}`);
 
-    setStatus('Готово! Файлы обработаны, подразделения сопоставлены, результат скачан.', 'ok');
+    setStatus('Готово! Результат обработан настолько, насколько это возможно с выбранными файлами.', 'ok');
   } catch (error) {
     setStatus(error.message || 'Произошла ошибка.', 'error');
   } finally {
     submitBtn.disabled = false;
   }
 });
+
+window.clearFile = clearFile;

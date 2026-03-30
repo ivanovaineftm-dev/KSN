@@ -121,7 +121,10 @@ def _read_excel_file(path: Path) -> pd.DataFrame:
     raise ValueError(f"Неподдерживаемый формат файла: {path.suffix}")
 
 
-def _build_department_dictionary(locations_path: Path) -> dict[str, str]:
+def _build_department_dictionary(locations_path: Path | None) -> dict[str, str]:
+    if locations_path is None:
+        return {}
+
     locations_df = _read_excel_file(locations_path)
     if locations_df.shape[1] < 2:
         return {}
@@ -135,7 +138,10 @@ def _build_department_dictionary(locations_path: Path) -> dict[str, str]:
     return result
 
 
-def _build_barista_dictionary(barista_path: Path) -> dict[str, str]:
+def _build_barista_dictionary(barista_path: Path | None) -> dict[str, str]:
+    if barista_path is None:
+        return {}
+
     barista_df = _read_excel_file(barista_path)
     if barista_df.shape[1] < 3:
         return {}
@@ -197,8 +203,8 @@ def _match_barista_department(mentor_value: object, barista_dictionary: dict[str
 
 def process_excel(
     input_path: Path,
-    locations_path: Path,
-    barista_path: Path,
+    locations_path: Path | None,
+    barista_path: Path | None,
     output_path: Path,
 ) -> list[dict[str, int | str]]:
     main_df = _read_excel_file(input_path)
