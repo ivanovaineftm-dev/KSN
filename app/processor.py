@@ -13,7 +13,6 @@ HEADER_ROW = 1
 COLUMN_C = 3
 COLUMN_D = 4
 COLUMN_F = 6
-COLUMN_G = 7
 COLUMN_H = 8
 TARGET_ROLE = "стажер"
 INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_color="FFFFC7CE")
@@ -128,11 +127,10 @@ def process_excel(input_path: Path, output_path: Path) -> list[dict[str, int | s
 
     Rules:
     1) Keep rows only if column C contains "стажер".
-    2) Remove rows if column G is empty.
-    3) Remove rows if column G contains "февраль".
-    4) Remove rows if column H is empty.
-    5) Fill row red if mentor role in column F is empty.
-    6) Fill row red if mentor role in column F does not match trainee role rules.
+    2) Remove rows if column H is empty.
+    3) Remove rows if column H contains February date values.
+    4) Fill row red if mentor role in column F is empty.
+    5) Fill row red if mentor role in column F does not match trainee role rules.
 
     Returns analytics sorted by descending quality:
     [
@@ -153,15 +151,13 @@ def process_excel(input_path: Path, output_path: Path) -> list[dict[str, int | s
         for row_idx in range(sheet.max_row, HEADER_ROW, -1):
             c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
             d_value = sheet.cell(row=row_idx, column=COLUMN_D).value
-            g_value = sheet.cell(row=row_idx, column=COLUMN_G).value
             f_value = sheet.cell(row=row_idx, column=COLUMN_F).value
             h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
 
             if (
                 not _contains_target_role(c_value)
-                or _is_blank(g_value)
-                or _contains_february(g_value)
                 or _is_blank(h_value)
+                or _contains_february(h_value)
             ):
                 rows_to_delete.append(row_idx)
                 continue
