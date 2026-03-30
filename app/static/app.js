@@ -1,6 +1,7 @@
 const form = document.getElementById('upload-form');
 const mainFileInput = document.getElementById('main-file-input');
 const locationsFileInput = document.getElementById('locations-file-input');
+const baristaFileInput = document.getElementById('barista-file-input');
 const submitBtn = document.getElementById('submit-btn');
 const statusNode = document.getElementById('status');
 const analyticsSection = document.getElementById('analytics-section');
@@ -74,9 +75,10 @@ form.addEventListener('submit', async (event) => {
 
   const mainFile = mainFileInput.files?.[0];
   const locationsFile = locationsFileInput.files?.[0];
+  const baristaFile = baristaFileInput.files?.[0];
 
-  if (!mainFile || !locationsFile) {
-    setStatus('Выберите основной файл и файл "Локации" перед загрузкой.', 'error');
+  if (!mainFile || !locationsFile || !baristaFile) {
+    setStatus('Выберите основной файл, файл "Локации" и файл "Должность" перед загрузкой.', 'error');
     return;
   }
 
@@ -87,6 +89,7 @@ form.addEventListener('submit', async (event) => {
     const formData = new FormData();
     formData.append('main_file', mainFile);
     formData.append('locations_file', locationsFile);
+    formData.append('barista_file', baristaFile);
 
     const response = await fetch('/upload', {
       method: 'POST',

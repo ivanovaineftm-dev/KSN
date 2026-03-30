@@ -33,27 +33,39 @@ ALLOWED_EXTENSIONS = (".xlsx", ".xls")
 async def upload_excel(
     main_file: UploadFile = File(...),
     locations_file: UploadFile = File(...),
+    barista_file: UploadFile = File(...),
 ) -> dict[str, str | list[dict[str, int | str]]]:
     main_filename = main_file.filename or "uploaded.xlsx"
     locations_filename = locations_file.filename or "locations.xlsx"
+    barista_filename = barista_file.filename or "barista.xlsx"
     if not main_filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail="Основной файл должен быть в формате .xlsx или .xls")
     if not locations_filename.lower().endswith(ALLOWED_EXTENSIONS):
         raise HTTPException(status_code=400, detail='Файл "Локации" должен быть в формате .xlsx или .xls')
+    if not barista_filename.lower().endswith(ALLOWED_EXTENSIONS):
+        raise HTTPException(status_code=400, detail='Файл "Должность" должен быть в формате .xlsx или .xls')
 
     token = uuid4().hex
     input_path = UPLOAD_DIR / f"{token}_main_{main_filename}"
     locations_path = UPLOAD_DIR / f"{token}_locations_{locations_filename}"
+    barista_path = UPLOAD_DIR / f"{token}_barista_{barista_filename}"
     output_name = f"processed_{Path(main_filename).stem}.xlsx"
     output_path = PROCESSED_DIR / f"{token}_{output_name}"
 
     input_data = await main_file.read()
     locations_data = await locations_file.read()
+    barista_data = await barista_file.read()
     input_path.write_bytes(input_data)
     locations_path.write_bytes(locations_data)
+    barista_path.write_bytes(barista_data)
 
     try:
-        analytics = process_excel(input_path=input_path, locations_path=locations_path, output_path=output_path)
+        analytics = process_excel(
+            input_path=input_path,
+            locations_path=locations_path,
+            barista_path=barista_path,
+            output_path=output_path,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

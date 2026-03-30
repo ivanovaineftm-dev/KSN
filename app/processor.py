@@ -80,11 +80,15 @@ def _normalize_role(value: object) -> str:
     )
 
 
-def _normalize_department_key(value: object) -> str:
+def _normalize_text(value: object) -> str:
     if _is_blank(value):
         return ""
 
     return re.sub(r"\s+", " ", str(value)).strip().lower()
+
+
+def _normalize_department_key(value: object) -> str:
+    return _normalize_text(value)
 
 
 def _normalize_department_display(value: object) -> str:
@@ -131,6 +135,20 @@ def _build_department_dictionary(locations_path: Path) -> dict[str, str]:
     return result
 
 
+def _build_barista_dictionary(barista_path: Path) -> dict[str, str]:
+    barista_df = _read_excel_file(barista_path)
+    if barista_df.shape[1] < 3:
+        return {}
+
+    result: dict[str, str] = {}
+    for row in barista_df.iloc[:, [1, 2]].itertuples(index=False, name=None):
+        department_value, search_value = row
+        if _is_blank(department_value) or _is_blank(search_value):
+            continue
+        result[_normalize_text(search_value)] = _normalize_department_display(department_value)
+    return result
+
+
 def _match_department(department_value: object, locations: dict[str, str]) -> str:
     key = _normalize_department_key(department_value)
     if not key:
@@ -152,14 +170,54 @@ def _match_department(department_value: object, locations: dict[str, str]) -> st
     return NOT_FOUND_LABEL
 
 
-def process_excel(input_path: Path, locations_path: Path, output_path: Path) -> list[dict[str, int | str]]:
+def _is_barista_role(value: object) -> bool:
+    return _normalize_role(value) == "бариста"
+
+
+def _match_barista_department(mentor_value: object, barista_dictionary: dict[str, str]) -> str | None:
+    mentor_key = _normalize_text(mentor_value)
+    if not mentor_key:
+        return None
+
+    exact_match = barista_dictionary.get(mentor_key)
+    if exact_match:
+        return exact_match
+
+    dictionary_keys = list(barista_dictionary.keys())
+    for item_key in dictionary_keys:
+        if mentor_key in item_key or item_key in mentor_key:
+            return barista_dictionary[item_key]
+
+    fuzzy = get_close_matches(mentor_key, dictionary_keys, n=1, cutoff=0.78)
+    if fuzzy:
+        return barista_dictionary[fuzzy[0]]
+
+    return None
+
+
+def process_excel(
+    input_path: Path,
+    locations_path: Path,
+    barista_path: Path,
+    output_path: Path,
+) -> list[dict[str, int | str]]:
     main_df = _read_excel_file(input_path)
     department_dictionary = _build_department_dictionary(locations_path)
+    barista_dictionary = _build_barista_dictionary(barista_path)
 
     if main_df.shape[1] < 8:
         raise ValueError("В основном файле недостаточно столбцов для обработки (ожидается минимум 8).")
 
     processed_df = main_df.copy()
+    replacement_mask = processed_df.iloc[:, 5].apply(_is_barista_role)
+    replacement_values = processed_df.loc[replacement_mask, :].apply(
+        lambda row: _match_barista_department(row.iloc[4], barista_dictionary),
+        axis=1,
+    )
+    for row_index, replacement_department in replacement_values.items():
+        if replacement_department:
+            processed_df.iat[row_index, 3] = replacement_department
+
     processed_df[NORMALIZED_DEPARTMENT_COLUMN] = processed_df.iloc[:, 3].apply(
         lambda value: _match_department(value, department_dictionary)
     )

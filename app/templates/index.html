@@ -125,7 +125,7 @@
 <body>
   <div class="container">
     <h1>Обработка Excel-файлов</h1>
-    <p>Загрузите основной Excel-файл и файл &laquo;Локации&raquo; (.xlsx или .xls). Сервис обработает данные, выполнит сопоставление подразделений, вернёт обработанный файл и построит аналитику качества.</p>
+    <p>Загрузите основной Excel-файл, файл &laquo;Локации&raquo; и файл &laquo;Должность&raquo; (.xlsx или .xls). Сервис обработает данные, выполнит сопоставление подразделений, вернёт обработанный файл и построит аналитику качества.</p>
 
     <form id="upload-form">
       <div class="row">
@@ -136,6 +136,10 @@
         <label>
           Файл &laquo;Локации&raquo;:
           <input id="locations-file-input" type="file" accept=".xlsx,.xls" required />
+        </label>
+        <label>
+          Файл &laquo;Должность&raquo;:
+          <input id="barista-file-input" type="file" accept=".xlsx,.xls" required />
         </label>
         <button id="submit-btn" type="submit">Обработать и скачать</button>
       </div>
