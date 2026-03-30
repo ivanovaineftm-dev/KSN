@@ -1,21 +1,19 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from difflib import get_close_matches
 from pathlib import Path
 import re
 
 import pandas as pd
-from openpyxl import load_workbook
+from openpyxl import Workbook
 from openpyxl.styles import PatternFill
 
 
-HEADER_ROW = 1
-COLUMN_C = 3
-COLUMN_D = 4
-COLUMN_F = 6
-COLUMN_H = 8
 TARGET_ROLE = "стажер"
 INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_color="FFFFC7CE")
+NORMALIZED_DEPARTMENT_COLUMN = "Подразделение (нормализованное)"
+NOT_FOUND_LABEL = "Не найдено"
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
@@ -90,7 +88,7 @@ def _normalize_department_key(value: object) -> str:
 
 
 def _normalize_department_display(value: object) -> str:
-    return re.sub(r"\s+", " ", str(value)).strip().upper()
+    return re.sub(r"\s+", " ", str(value)).strip()
 
 
 def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
@@ -107,85 +105,103 @@ def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
 
 
 def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object) -> bool:
-    """Return True when row violates mentor validation rules.
-
-    Validation rules:
-    - mentor role (column F) cannot be empty;
-    - for supported trainee roles (column C), mentor role (column F)
-      must match role-specific allowed values.
-    """
     return _is_blank(mentor_role) or not _mentor_role_is_valid(trainee_role, mentor_role)
 
 
-def _paint_row(sheet, row_idx: int, max_column: int) -> None:
-    for column_idx in range(1, max_column + 1):
-        sheet.cell(row=row_idx, column=column_idx).fill = INVALID_ROW_FILL
+def _read_excel_file(path: Path) -> pd.DataFrame:
+    suffix = path.suffix.lower()
+    if suffix == ".xlsx":
+        return pd.read_excel(path, engine="openpyxl")
+    if suffix == ".xls":
+        return pd.read_excel(path, engine="xlrd")
+    raise ValueError(f"Неподдерживаемый формат файла: {path.suffix}")
 
 
-def process_excel(input_path: Path, output_path: Path) -> list[dict[str, int | str]]:
-    """Process sheets and calculate quality analytics by department.
+def _build_department_dictionary(locations_path: Path) -> dict[str, str]:
+    locations_df = _read_excel_file(locations_path)
+    if locations_df.shape[1] < 2:
+        return {}
 
-    Rules:
-    1) Keep rows only if column C contains "стажер".
-    2) Remove rows if column H is empty.
-    3) Remove rows if column H contains February date values.
-    4) Fill row red if mentor role in column F is empty.
-    5) Fill row red if mentor role in column F does not match trainee role rules.
+    result: dict[str, str] = {}
+    for value in locations_df.iloc[:, 1]:
+        if _is_blank(value):
+            continue
+        display = _normalize_department_display(value)
+        result[_normalize_department_key(value)] = display
+    return result
 
-    Returns analytics sorted by descending quality:
-    [
-      {
-        "department": str,
-        "total_rows": int,
-        "valid_rows": int,
-        "quality": int
-      }
-    ]
-    """
-    workbook = load_workbook(input_path)
-    department_stats: dict[str, dict[str, int | str]] = {}
 
-    for sheet in workbook.worksheets:
-        rows_to_delete: list[int] = []
-        rows_to_highlight: list[int] = []
-        for row_idx in range(sheet.max_row, HEADER_ROW, -1):
-            c_value = sheet.cell(row=row_idx, column=COLUMN_C).value
-            d_value = sheet.cell(row=row_idx, column=COLUMN_D).value
-            f_value = sheet.cell(row=row_idx, column=COLUMN_F).value
-            h_value = sheet.cell(row=row_idx, column=COLUMN_H).value
+def _match_department(department_value: object, locations: dict[str, str]) -> str:
+    key = _normalize_department_key(department_value)
+    if not key:
+        return NOT_FOUND_LABEL
 
-            if (
-                not _contains_target_role(c_value)
-                or _is_blank(h_value)
-                or _contains_february(h_value)
-            ):
-                rows_to_delete.append(row_idx)
-                continue
+    exact = locations.get(key)
+    if exact:
+        return exact
 
-            has_error = _row_has_mentor_validation_error(c_value, f_value)
-            if has_error:
-                rows_to_highlight.append(row_idx)
+    location_keys = list(locations.keys())
+    for location_key in location_keys:
+        if key in location_key or location_key in key:
+            return locations[location_key]
 
-            department_key = _normalize_department_key(d_value)
-            if not department_key:
-                continue
+    fuzzy = get_close_matches(key, location_keys, n=1, cutoff=0.78)
+    if fuzzy:
+        return locations[fuzzy[0]]
 
-            stats = department_stats.setdefault(
-                department_key,
-                {"department": _normalize_department_display(d_value), "total_rows": 0, "valid_rows": 0},
-            )
-            stats["total_rows"] += 1
-            if not has_error:
-                stats["valid_rows"] += 1
+    return NOT_FOUND_LABEL
 
-        for row_idx in rows_to_highlight:
-            _paint_row(sheet, row_idx, sheet.max_column)
 
-        for row_idx in rows_to_delete:
-            sheet.delete_rows(row_idx, 1)
+def process_excel(input_path: Path, locations_path: Path, output_path: Path) -> list[dict[str, int | str]]:
+    main_df = _read_excel_file(input_path)
+    department_dictionary = _build_department_dictionary(locations_path)
+
+    if main_df.shape[1] < 8:
+        raise ValueError("В основном файле недостаточно столбцов для обработки (ожидается минимум 8).")
+
+    processed_df = main_df.copy()
+    processed_df[NORMALIZED_DEPARTMENT_COLUMN] = processed_df.iloc[:, 3].apply(
+        lambda value: _match_department(value, department_dictionary)
+    )
+
+    keep_mask = processed_df.iloc[:, 2].apply(_contains_target_role)
+    keep_mask &= ~processed_df.iloc[:, 7].apply(_is_blank)
+    keep_mask &= ~processed_df.iloc[:, 7].apply(_contains_february)
+    processed_df = processed_df[keep_mask].copy()
+
+    invalid_mask = processed_df.apply(
+        lambda row: _row_has_mentor_validation_error(row.iloc[2], row.iloc[5]),
+        axis=1,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Processed"
+    sheet.append(processed_df.columns.tolist())
+
+    for row_offset, row_values in enumerate(processed_df.itertuples(index=False, name=None), start=2):
+        sheet.append(list(row_values))
+        if bool(invalid_mask.iloc[row_offset - 2]):
+            for col_idx in range(1, len(processed_df.columns) + 1):
+                sheet.cell(row=row_offset, column=col_idx).fill = INVALID_ROW_FILL
+
     workbook.save(output_path)
+
+    department_stats: dict[str, dict[str, int | str]] = {}
+    for row_values, has_error in zip(processed_df.itertuples(index=False, name=None), invalid_mask.tolist()):
+        department_name = row_values[-1]
+        if department_name == NOT_FOUND_LABEL:
+            continue
+
+        department_key = _normalize_department_key(department_name)
+        stats = department_stats.setdefault(
+            department_key,
+            {"department": str(department_name), "total_rows": 0, "valid_rows": 0},
+        )
+        stats["total_rows"] += 1
+        if not has_error:
+            stats["valid_rows"] += 1
 
     analytics: list[dict[str, int | str]] = []
     for stats in department_stats.values():
