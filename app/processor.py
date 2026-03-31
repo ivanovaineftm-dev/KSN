@@ -7,7 +7,7 @@ import re
 
 import pandas as pd
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, PatternFill
 
 
 TARGET_ROLE = "стажер"
@@ -277,18 +277,18 @@ def process_excel(
             for col_idx in range(1, len(processed_df.columns) + 1):
                 sheet.cell(row=row_offset, column=col_idx).fill = INVALID_ROW_FILL
 
-    workbook.save(output_path)
-
     department_stats: dict[str, dict[str, int | str]] = {}
     for row_values, has_error in zip(processed_df.itertuples(index=False, name=None), invalid_mask.tolist()):
-        department_name = row_values[-1]
-        if department_name == NOT_FOUND_LABEL:
+        department_name = row_values[3]
+        if _is_blank(department_name):
             continue
 
         department_key = _normalize_department_key(department_name)
+        if not department_key:
+            continue
         stats = department_stats.setdefault(
             department_key,
-            {"department": str(department_name), "total_rows": 0, "valid_rows": 0},
+            {"department": _normalize_department_display(department_name), "total_rows": 0, "valid_rows": 0},
         )
         stats["total_rows"] += 1
         if not has_error:
@@ -309,4 +309,17 @@ def process_excel(
         )
 
     analytics.sort(key=lambda item: (-int(item["quality"]), str(item["department"])))
+
+    analytics_sheet = workbook.create_sheet(title="Аналитика")
+    analytics_sheet.append(["Подразделение", "КСН"])
+    analytics_sheet["A1"].font = Font(bold=True)
+    analytics_sheet["B1"].font = Font(bold=True)
+
+    for item in analytics:
+        analytics_sheet.append([str(item["department"]), f"{int(item['quality'])}%"])
+
+    analytics_sheet.column_dimensions["A"].width = 42
+    analytics_sheet.column_dimensions["B"].width = 12
+
+    workbook.save(output_path)
     return analytics
