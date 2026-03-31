@@ -14,6 +14,7 @@ TARGET_ROLE = "стажер"
 INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_color="FFFFC7CE")
 NORMALIZED_DEPARTMENT_COLUMN = "Подразделение (Hr-index)"
 NOT_FOUND_LABEL = "Не найдено"
+ANALYTICS_COLUMN_INDEX = 8  # Столбец I в 1-based нумерации
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
@@ -279,16 +280,20 @@ def process_excel(
 
     workbook.save(output_path)
 
+    if processed_df.shape[1] <= ANALYTICS_COLUMN_INDEX:
+        raise ValueError("В обработанном файле отсутствует столбец I для расчета аналитики.")
+
     department_stats: dict[str, dict[str, int | str]] = {}
-    for row_values, has_error in zip(processed_df.itertuples(index=False, name=None), invalid_mask.tolist()):
-        department_name = row_values[-1]
-        if department_name == NOT_FOUND_LABEL:
+    analytics_values = processed_df.iloc[:, ANALYTICS_COLUMN_INDEX]
+    for department_name, has_error in zip(analytics_values.tolist(), invalid_mask.tolist()):
+        if _is_blank(department_name) or department_name == NOT_FOUND_LABEL:
             continue
 
-        department_key = _normalize_department_key(department_name)
+        department_display = _normalize_department_display(department_name)
+        department_key = _normalize_department_key(department_display)
         stats = department_stats.setdefault(
             department_key,
-            {"department": str(department_name), "total_rows": 0, "valid_rows": 0},
+            {"department": department_display, "total_rows": 0, "valid_rows": 0},
         )
         stats["total_rows"] += 1
         if not has_error:
