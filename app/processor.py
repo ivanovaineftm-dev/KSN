@@ -7,7 +7,10 @@ import re
 
 import pandas as pd
 from openpyxl import Workbook
+from openpyxl.styles import Font
 from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.table import Table, TableStyleInfo
 
 
 TARGET_ROLE = "стажер"
@@ -15,6 +18,8 @@ INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_co
 NORMALIZED_DEPARTMENT_COLUMN = "Подразделение (Hr-index)"
 NOT_FOUND_LABEL = "Не найдено"
 ANALYTICS_COLUMN_INDEX = 3  # Столбец D в 0-based нумерации
+ANALYTICS_SHEET_TITLE = "Аналитика"
+ANALYTICS_COLUMNS = ("Подразделение", "КСН (%)")
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
@@ -116,6 +121,8 @@ def _normalize_department_key(value: object) -> str:
 
 
 def _normalize_department_display(value: object) -> str:
+    if _is_blank(value):
+        return ""
     return re.sub(r"\s+", " ", str(value)).strip()
 
 
@@ -278,40 +285,99 @@ def process_excel(
             for col_idx in range(1, len(processed_df.columns) + 1):
                 sheet.cell(row=row_offset, column=col_idx).fill = INVALID_ROW_FILL
 
-    workbook.save(output_path)
+    analytics: list[dict[str, int | str]] = []
+    try:
+        analytics_df = _build_analytics_dataframe(processed_df, invalid_mask)
+        _append_analytics_sheet(workbook, analytics_df)
+        analytics = _analytics_payload_from_dataframe(analytics_df)
+    except Exception:
+        if ANALYTICS_SHEET_TITLE in workbook.sheetnames:
+            del workbook[ANALYTICS_SHEET_TITLE]
+        _append_analytics_sheet(workbook, pd.DataFrame(columns=ANALYTICS_COLUMNS))
 
+    workbook.save(output_path)
+    return analytics
+
+
+def _build_analytics_dataframe(processed_df: pd.DataFrame, invalid_mask: pd.Series) -> pd.DataFrame:
     if processed_df.shape[1] <= ANALYTICS_COLUMN_INDEX:
         raise ValueError("В обработанном файле отсутствует столбец D для расчета аналитики.")
 
-    department_stats: dict[str, dict[str, int | str]] = {}
-    analytics_values = processed_df.iloc[:, ANALYTICS_COLUMN_INDEX]
-    for department_name, has_error in zip(analytics_values.tolist(), invalid_mask.tolist()):
-        if _is_blank(department_name):
-            continue
+    department_series = processed_df.iloc[:, ANALYTICS_COLUMN_INDEX].apply(_normalize_department_display)
+    analytics_input = pd.DataFrame(
+        {
+            "department": department_series,
+            "is_valid": ~invalid_mask.astype(bool),
+        }
+    )
+    analytics_input = analytics_input[analytics_input["department"] != ""].copy()
+    if analytics_input.empty:
+        return pd.DataFrame(columns=ANALYTICS_COLUMNS)
 
-        department_display = _normalize_department_display(department_name)
-        department_key = _normalize_department_key(department_display)
-        stats = department_stats.setdefault(
-            department_key,
-            {"department": department_display, "total_rows": 0, "valid_rows": 0},
-        )
-        stats["total_rows"] += 1
-        if not has_error:
-            stats["valid_rows"] += 1
+    aggregated = (
+        analytics_input.groupby("department", as_index=False)
+        .agg(total_rows=("is_valid", "size"), valid_rows=("is_valid", "sum"))
+        .astype({"total_rows": "int64", "valid_rows": "int64"})
+    )
+    aggregated["quality_int"] = ((aggregated["valid_rows"] / aggregated["total_rows"]) * 100).round().astype(int)
+    aggregated["quality_ratio"] = aggregated["quality_int"] / 100
+    aggregated = aggregated.sort_values(["quality_int", "department"], ascending=[False, True]).reset_index(drop=True)
 
-    analytics: list[dict[str, int | str]] = []
-    for stats in department_stats.values():
-        total_rows = int(stats["total_rows"])
-        valid_rows = int(stats["valid_rows"])
-        quality = round((valid_rows / total_rows) * 100) if total_rows else 0
-        analytics.append(
+    aggregated.rename(columns={"department": ANALYTICS_COLUMNS[0], "quality_ratio": ANALYTICS_COLUMNS[1]}, inplace=True)
+    return aggregated[[ANALYTICS_COLUMNS[0], ANALYTICS_COLUMNS[1], "total_rows", "valid_rows", "quality_int"]]
+
+
+def _append_analytics_sheet(workbook: Workbook, analytics_df: pd.DataFrame) -> None:
+    analytics_sheet = workbook.create_sheet(title=ANALYTICS_SHEET_TITLE)
+    analytics_sheet.append(list(ANALYTICS_COLUMNS))
+
+    for cell in analytics_sheet[1]:
+        cell.font = Font(bold=True)
+
+    if analytics_df.empty:
+        analytics_sheet.auto_filter.ref = "A1:B1"
+        return
+
+    for _, row in analytics_df.iterrows():
+        analytics_sheet.append([row[ANALYTICS_COLUMNS[0]], row[ANALYTICS_COLUMNS[1]]])
+
+    last_row = analytics_sheet.max_row
+    table = Table(displayName="AnalyticsTable", ref=f"A1:B{last_row}")
+    table.tableStyleInfo = TableStyleInfo(
+        name="TableStyleMedium2",
+        showFirstColumn=False,
+        showLastColumn=False,
+        showRowStripes=True,
+        showColumnStripes=False,
+    )
+    analytics_sheet.add_table(table)
+    analytics_sheet.auto_filter.ref = f"A1:B{last_row}"
+
+    for row_idx in range(2, last_row + 1):
+        analytics_sheet.cell(row=row_idx, column=2).number_format = "0%"
+
+    for col_idx in range(1, 3):
+        column_letter = get_column_letter(col_idx)
+        max_width = 0
+        for row_idx in range(1, last_row + 1):
+            value = analytics_sheet.cell(row=row_idx, column=col_idx).value
+            value_len = len(str(value)) if value is not None else 0
+            max_width = max(max_width, value_len)
+        analytics_sheet.column_dimensions[column_letter].width = min(max_width + 2, 60)
+
+
+def _analytics_payload_from_dataframe(analytics_df: pd.DataFrame) -> list[dict[str, int | str]]:
+    if analytics_df.empty:
+        return []
+
+    payload: list[dict[str, int | str]] = []
+    for _, row in analytics_df.iterrows():
+        payload.append(
             {
-                "department": str(stats["department"]),
-                "total_rows": total_rows,
-                "valid_rows": valid_rows,
-                "quality": quality,
+                "department": str(row[ANALYTICS_COLUMNS[0]]),
+                "total_rows": int(row["total_rows"]),
+                "valid_rows": int(row["valid_rows"]),
+                "quality": int(row["quality_int"]),
             }
         )
-
-    analytics.sort(key=lambda item: (-int(item["quality"]), str(item["department"])))
-    return analytics
+    return payload
