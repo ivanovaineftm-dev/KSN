@@ -12,7 +12,7 @@ from openpyxl.styles import PatternFill
 
 TARGET_ROLE = "стажер"
 INVALID_ROW_FILL = PatternFill(fill_type="solid", start_color="FFFFC7CE", end_color="FFFFC7CE")
-NORMALIZED_DEPARTMENT_COLUMN = "Подразделение (нормализованное)"
+NORMALIZED_DEPARTMENT_COLUMN = "Подразделение (Hr-index)"
 NOT_FOUND_LABEL = "Не найдено"
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
@@ -133,11 +133,16 @@ def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object) 
 
 def _read_excel_file(path: Path) -> pd.DataFrame:
     suffix = path.suffix.lower()
-    if suffix == ".xlsx":
-        return pd.read_excel(path, engine="openpyxl")
-    if suffix == ".xls":
-        return pd.read_excel(path, engine="xlrd")
-    raise ValueError(f"Неподдерживаемый формат файла: {path.suffix}")
+    try:
+        if suffix == ".xlsx":
+            return pd.read_excel(path, engine="openpyxl")
+        if suffix == ".xls":
+            return pd.read_excel(path, engine="xlrd")
+        raise ValueError(f"Неподдерживаемый формат файла: {path.suffix}")
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"Файл {path.name} повреждён или не читается") from exc
 
 
 def _build_department_dictionary(locations_path: Path | None) -> dict[str, str]:
@@ -182,15 +187,6 @@ def _match_department(department_value: object, locations: dict[str, str]) -> st
     exact = locations.get(key)
     if exact:
         return exact
-
-    location_keys = list(locations.keys())
-    for location_key in location_keys:
-        if key in location_key or location_key in key:
-            return locations[location_key]
-
-    fuzzy = get_close_matches(key, location_keys, n=1, cutoff=0.78)
-    if fuzzy:
-        return locations[fuzzy[0]]
 
     return NOT_FOUND_LABEL
 
