@@ -103,7 +103,11 @@ def _normalize_text(value: object) -> str:
     if _is_blank(value):
         return ""
 
-    return re.sub(r"\s+", " ", str(value)).strip().lower()
+    normalized = str(value).strip().lower().replace("ё", "е")
+    normalized = normalized.replace("–", "-").replace("—", "-")
+    normalized = re.sub(r"\s*-\s*", "-", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
 
 
 def _normalize_department_key(value: object) -> str:
@@ -209,9 +213,17 @@ def _match_barista_department(mentor_value: object, barista_dictionary: dict[str
         if mentor_key in item_key or item_key in mentor_key:
             return barista_dictionary[item_key]
 
-    fuzzy = get_close_matches(mentor_key, dictionary_keys, n=1, cutoff=0.78)
+    condensed_mentor_key = mentor_key.replace(" ", "")
+    for item_key in dictionary_keys:
+        if condensed_mentor_key == item_key.replace(" ", ""):
+            return barista_dictionary[item_key]
+
+    fuzzy = get_close_matches(condensed_mentor_key, [item.replace(" ", "") for item in dictionary_keys], n=1, cutoff=0.82)
     if fuzzy:
-        return barista_dictionary[fuzzy[0]]
+        match_key = fuzzy[0]
+        for item_key in dictionary_keys:
+            if item_key.replace(" ", "") == match_key:
+                return barista_dictionary[item_key]
 
     return None
 
