@@ -30,7 +30,7 @@ MENTOR_ROLE_RULES: dict[str, set[str]] = {
         "повар-универсал",
         "повар-бригадир",
         "повар 1 категории",
-        "повар 2категории",
+        "повар 2 категории",
     },
     "повар-универсал стажер": {"повар-универсал", "повар", "старший кассир", "кассир"},
     "работник торгового зала-стажер": {
@@ -39,19 +39,24 @@ MENTOR_ROLE_RULES: dict[str, set[str]] = {
         "работник торгового зала",
         "повар-универсал",
     },
-    "оператор-кассир стажер": {"оператор-кассир", "старший оператор-кассир"},
+    "оператор-кассир стажер": {"оператор-кассир", "старший оператор"},
     "заместитель директора азс по направлению кафе-стажер": {
         "заместитель директора азс по направлению кафе"
     },
     "оператор мини-кафе-стажер": {
         "оператор мини-кафе",
-        "старший оператор-кассир",
+        "старший оператор",
         "оператор-кассир",
     },
     "бармен-бариста-стажер": {"бармен-бариста", "менеджер-кассир"},
     "менеджер-кассир стажер": {"менеджер-кассир", "заместитель директора"},
-    "официант-стажер": {"официант", "менеджер кассир"},
-    "хостес-стажер": {"хостес", "менеджер кассир"},
+    "официант-стажер": {"официант", "менеджер-кассир"},
+    "хостес-стажер": {"хостес", "менеджер-кассир"},
+}
+
+DEPARTMENT_SPECIFIC_MENTOR_ROLE_RULES: dict[tuple[str, str], set[str]] = {
+    ("хостес-стажер", "старик и море 2 (брестская)"): {"заместитель директора", "хостес"},
+    ("официант-стажер", "старик и море 2 (брестская)"): {"заместитель директора", "официант"},
 }
 
 
@@ -134,9 +139,13 @@ def _normalize_department_display(value: object) -> str:
     return re.sub(r"\s+", " ", str(value)).strip()
 
 
-def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
+def _mentor_role_is_valid(trainee_role: object, mentor_role: object, department: object) -> bool:
     normalized_trainee_role = _normalize_role(trainee_role)
-    allowed_mentor_roles = MENTOR_ROLE_RULES.get(normalized_trainee_role)
+    normalized_department = _normalize_department_key(department)
+    department_specific_allowed = DEPARTMENT_SPECIFIC_MENTOR_ROLE_RULES.get(
+        (normalized_trainee_role, normalized_department)
+    )
+    allowed_mentor_roles = department_specific_allowed or MENTOR_ROLE_RULES.get(normalized_trainee_role)
     if not allowed_mentor_roles:
         return True
 
@@ -147,8 +156,8 @@ def _mentor_role_is_valid(trainee_role: object, mentor_role: object) -> bool:
     return normalized_mentor_role in allowed_mentor_roles
 
 
-def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object) -> bool:
-    return _is_blank(mentor_role) or not _mentor_role_is_valid(trainee_role, mentor_role)
+def _row_has_mentor_validation_error(trainee_role: object, mentor_role: object, department: object) -> bool:
+    return _is_blank(mentor_role) or not _mentor_role_is_valid(trainee_role, mentor_role, department)
 
 
 def _read_excel_file(path: Path) -> pd.DataFrame:
@@ -278,7 +287,7 @@ def process_excel(
     processed_df = processed_df[keep_mask].copy()
 
     invalid_mask = processed_df.apply(
-        lambda row: _row_has_mentor_validation_error(row.iloc[2], row.iloc[5]),
+        lambda row: _row_has_mentor_validation_error(row.iloc[2], row.iloc[5], row.iloc[3]),
         axis=1,
     )
 
