@@ -63,18 +63,18 @@ def _is_blank(value: object) -> bool:
     return False
 
 
-def _contains_february(value: object) -> bool:
+def _contains_excluded_month(value: object) -> bool:
     if _is_blank(value):
         return False
 
     if isinstance(value, (datetime, date)):
-        return value.month == 2
+        return value.month in {2, 3, 5}
 
     value_text = str(value).strip().lower()
-    if "феврал" in value_text:
+    if any(month in value_text for month in ("феврал", "март", "май")):
         return True
 
-    return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
+    return re.search(r"(?:^|\D)\d{1,2}\.(?:02|03|05)\.\d{4}(?:$|\D)", value_text) is not None
 
 
 def _contains_target_role(value: object) -> bool:
@@ -85,6 +85,14 @@ def _contains_target_role(value: object) -> bool:
     normalized_text = value_text.replace("–", "-").replace("—", "-")
 
     return TARGET_ROLE in normalized_text
+
+
+def _contains_profnavigator(value: object) -> bool:
+    if _is_blank(value):
+        return False
+
+    value_text = str(value).strip().lower().replace("ё", "е")
+    return "профнавигатор" in value_text
 
 
 def _normalize_role(value: object) -> str:
@@ -264,8 +272,9 @@ def process_excel(
     )
 
     keep_mask = processed_df.iloc[:, 2].apply(_contains_target_role)
+    keep_mask &= ~processed_df.iloc[:, 2].apply(_contains_profnavigator)
     keep_mask &= ~processed_df.iloc[:, 7].apply(_is_blank)
-    keep_mask &= ~processed_df.iloc[:, 7].apply(_contains_february)
+    keep_mask &= ~processed_df.iloc[:, 7].apply(_contains_excluded_month)
     processed_df = processed_df[keep_mask].copy()
 
     invalid_mask = processed_df.apply(
