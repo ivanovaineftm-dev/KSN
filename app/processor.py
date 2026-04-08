@@ -63,18 +63,18 @@ def _is_blank(value: object) -> bool:
     return False
 
 
-def _contains_february(value: object) -> bool:
+def _contains_march_or_may(value: object) -> bool:
     if _is_blank(value):
         return False
 
     if isinstance(value, (datetime, date)):
-        return value.month == 2
+        return value.month in {3, 5}
 
     value_text = str(value).strip().lower()
-    if "феврал" in value_text:
+    if "март" in value_text or "май" in value_text:
         return True
 
-    return re.search(r"(?:^|\D)\d{1,2}\.02\.\d{4}(?:$|\D)", value_text) is not None
+    return re.search(r"(?:^|\D)\d{1,2}\.(?:03|05)\.\d{4}(?:$|\D)", value_text) is not None
 
 
 def _contains_target_role(value: object) -> bool:
@@ -264,8 +264,8 @@ def process_excel(
     )
 
     keep_mask = processed_df.iloc[:, 2].apply(_contains_target_role)
-    keep_mask &= ~processed_df.iloc[:, 7].apply(_is_blank)
-    keep_mask &= ~processed_df.iloc[:, 7].apply(_contains_february)
+    keep_mask &= ~processed_df.iloc[:, 6].apply(_is_blank)
+    keep_mask &= ~processed_df.iloc[:, 6].apply(_contains_march_or_may)
     processed_df = processed_df[keep_mask].copy()
 
     invalid_mask = processed_df.apply(
