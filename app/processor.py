@@ -114,17 +114,18 @@ def _normalize_role(value: object) -> str:
     if _is_blank(value):
         return ""
 
-    normalized = (
+    return (
         str(value)
         .strip()
         .lower()
         .replace("ё", "е")
         .replace("–", "-")
         .replace("—", "-")
+        .replace(" - ", "-")
+        .replace("- ", "-")
+        .replace(" -", "-")
+        .replace("  ", " ")
     )
-    normalized = re.sub(r"\s*-\s*", "-", normalized)
-    normalized = re.sub(r"\s+", " ", normalized)
-    return normalized
 
 
 def _normalize_text(value: object) -> str:
@@ -276,15 +277,14 @@ def process_excel(
         raise ValueError("В основном файле недостаточно столбцов для обработки (ожидается минимум 8).")
 
     processed_df = main_df.copy()
-    if barista_dictionary:
-        replacement_mask = processed_df.iloc[:, 5].apply(_is_barista_role)
-        replacement_values = processed_df.loc[replacement_mask, :].apply(
-            lambda row: _match_barista_department(row.iloc[4], barista_dictionary),
-            axis=1,
-        )
-        for row_index, replacement_department in replacement_values.items():
-            if replacement_department:
-                processed_df.iat[row_index, 3] = replacement_department
+    replacement_mask = processed_df.iloc[:, 5].apply(_is_barista_role)
+    replacement_values = processed_df.loc[replacement_mask, :].apply(
+        lambda row: _match_barista_department(row.iloc[4], barista_dictionary),
+        axis=1,
+    )
+    for row_index, replacement_department in replacement_values.items():
+        if replacement_department:
+            processed_df.iat[row_index, 3] = replacement_department
 
     processed_df[NORMALIZED_DEPARTMENT_COLUMN] = processed_df.iloc[:, 3].apply(
         lambda value: _match_department(value, department_dictionary)
