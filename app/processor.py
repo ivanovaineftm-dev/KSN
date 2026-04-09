@@ -20,6 +20,16 @@ NOT_FOUND_LABEL = "Не найдено"
 ANALYTICS_COLUMN_INDEX = 3  # Столбец D в 0-based нумерации
 ANALYTICS_SHEET_TITLE = "Аналитика"
 ANALYTICS_COLUMNS = ("Подразделение", "КСН (%)")
+OUTPUT_COLUMN_HEADERS = [
+    "Дата приема",
+    "Сотрудник",
+    "Должность",
+    "Подразделение",
+    "Наставник",
+    "Должность наставника",
+    "Дата первого прохода",
+    "Приход на второй день",
+]
 
 MENTOR_ROLE_RULES: dict[str, set[str]] = {
     "бариста-стажер": {"бариста"},
@@ -279,6 +289,7 @@ def process_excel(
     processed_df[NORMALIZED_DEPARTMENT_COLUMN] = processed_df.iloc[:, 3].apply(
         lambda value: _match_department(value, department_dictionary)
     )
+    processed_df.columns = OUTPUT_COLUMN_HEADERS + processed_df.columns[len(OUTPUT_COLUMN_HEADERS) :].tolist()
 
     keep_mask = processed_df.iloc[:, 2].apply(_contains_target_role)
     keep_mask &= ~processed_df.iloc[:, 2].apply(_contains_profnavigator)
