@@ -220,9 +220,7 @@ def _build_barista_dictionary(barista_path: Path | None) -> dict[str, str]:
 
 
 def _resolve_barista_columns(barista_df: pd.DataFrame) -> tuple[str | int, str | int]:
-    normalized_column_map = {
-        column: _normalize_text(column) for column in barista_df.columns
-    }
+    normalized_column_map = {column: _normalize_text(column) for column in barista_df.columns}
 
     employee_aliases = {"1", "сотрудник"}
     department_aliases = {"2", "подразделение"}
@@ -317,7 +315,7 @@ def process_excel(
     locations_path: Path | None,
     barista_path: Path | None,
     output_path: Path,
-) -> list[dict[str, int | str]]:
+) -> dict[str, int | list[dict[str, int | str]]]:
     main_df = _read_excel_file(input_path)
     department_dictionary = _build_department_dictionary(locations_path)
     barista_dictionary = _build_barista_dictionary(barista_path)
@@ -363,18 +361,28 @@ def process_excel(
             for col_idx in range(1, len(processed_df.columns) + 1):
                 sheet.cell(row=row_offset, column=col_idx).fill = INVALID_ROW_FILL
 
-    analytics: list[dict[str, int | str]] = []
+    departments: list[dict[str, int | str]] = []
     try:
         analytics_df = _build_analytics_dataframe(processed_df, invalid_mask)
         _append_analytics_sheet(workbook, analytics_df)
-        analytics = _analytics_payload_from_dataframe(analytics_df)
+        departments = _analytics_payload_from_dataframe(analytics_df)
     except Exception:
         if ANALYTICS_SHEET_TITLE in workbook.sheetnames:
             del workbook[ANALYTICS_SHEET_TITLE]
         _append_analytics_sheet(workbook, pd.DataFrame(columns=ANALYTICS_COLUMNS))
 
     workbook.save(output_path)
-    return analytics
+
+    total_rows = int(processed_df.shape[0])
+    errors = int(invalid_mask.astype(bool).sum())
+    valid_rows = int(total_rows - errors)
+
+    return {
+        "total_rows": total_rows,
+        "errors": errors,
+        "valid_rows": valid_rows,
+        "departments": departments,
+    }
 
 
 def _build_analytics_dataframe(processed_df: pd.DataFrame, invalid_mask: pd.Series) -> pd.DataFrame:
