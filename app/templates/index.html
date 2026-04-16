@@ -3,101 +3,210 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Excel Processor</title>
+  <title>Конвертер КСН</title>
   <style>
+    :root {
+      --bg: #f5f5f5;
+      --card: #ffffff;
+      --text-primary: #1f2937;
+      --text-secondary: #6b7280;
+      --border: #e5e7eb;
+      --accent: #dc2626;
+      --accent-hover: #b91c1c;
+      --neutral-btn: #e5e7eb;
+      --neutral-btn-hover: #d1d5db;
+      --shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      --radius: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-      font-family: Arial, sans-serif;
+      font-family: "Inter", "Segoe UI", Arial, sans-serif;
       margin: 0;
-      background: #f5f7fb;
-      color: #222;
+      background: var(--bg);
+      color: var(--text-primary);
     }
+
     .container {
-      max-width: 960px;
-      margin: 48px auto;
-      padding: 24px;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+      max-width: 1080px;
+      margin: 40px auto;
+      padding: 0 20px;
     }
-    h1 {
-      margin-top: 0;
-      font-size: 28px;
+
+    .page-title {
+      text-align: center;
+      margin: 0 0 10px;
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: 0.3px;
     }
-    p {
-      color: #555;
-      margin-bottom: 20px;
+
+    .lead {
+      margin: 0 auto 24px;
+      max-width: 880px;
+      text-align: center;
+      color: var(--text-secondary);
+      line-height: 1.5;
     }
-    .row {
-      display: flex;
-      gap: 12px;
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+    }
+
+    .upload-card {
+      margin-bottom: 18px;
+    }
+
+    .upload-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(220px, 1fr));
+      gap: 14px;
       align-items: stretch;
-      flex-wrap: wrap;
     }
+
     .file-group {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      min-width: 230px;
-      flex: 1;
+      gap: 10px;
+      background: #fafafa;
     }
-    .file-controls {
+
+    .file-label {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .file-input {
+      display: none;
+    }
+
+    .file-actions {
       display: flex;
-      align-items: center;
       gap: 8px;
       flex-wrap: wrap;
     }
-    input[type='file'] {
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
-      background: #fff;
-      max-width: 100%;
-    }
-    .file-name {
-      font-size: 12px;
-      color: #475569;
-    }
-    .secondary-btn {
-      background: #e2e8f0;
-      color: #1f2937;
-    }
-    button {
-      padding: 10px 16px;
+
+    .btn {
       border: none;
-      border-radius: 8px;
-      background: #2563eb;
-      color: #fff;
+      border-radius: 10px;
       font-weight: 600;
       cursor: pointer;
+      transition: all 0.2s ease;
     }
-    button:disabled {
-      opacity: 0.6;
+
+    .btn-select {
+      padding: 8px 12px;
+      font-size: 13px;
+      background: #dbeafe;
+      color: #1e3a8a;
+    }
+
+    .btn-select:hover {
+      background: #bfdbfe;
+    }
+
+    .btn-clear {
+      padding: 8px 12px;
+      font-size: 13px;
+      background: var(--neutral-btn);
+      color: #374151;
+    }
+
+    .btn-clear:hover {
+      background: var(--neutral-btn-hover);
+    }
+
+    .file-name {
+      font-size: 12px;
+      color: var(--text-secondary);
+      min-height: 16px;
+      word-break: break-word;
+    }
+
+    .submit-wrap {
+      margin-top: 18px;
+      text-align: center;
+    }
+
+    .submit-btn {
+      min-width: 250px;
+      padding: 13px 22px;
+      font-size: 16px;
+      border-radius: 12px;
+      background: var(--accent);
+      color: #fff;
+      box-shadow: 0 8px 18px rgba(220, 38, 38, 0.25);
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .submit-btn:hover {
+      background: var(--accent-hover);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.72;
       cursor: wait;
     }
+
+    .spinner {
+      width: 17px;
+      height: 17px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+      display: none;
+    }
+
+    .submit-btn.loading .spinner {
+      display: inline-block;
+    }
+
     .status {
       margin-top: 14px;
       font-size: 14px;
-      min-height: 20px;
+      min-height: 22px;
+      text-align: center;
+      color: var(--text-secondary);
     }
+
     .status.error {
       color: #b91c1c;
     }
+
     .status.ok {
       color: #166534;
     }
+
     .analytics {
-      margin-top: 28px;
-      border-top: 1px solid #e5e7eb;
-      padding-top: 22px;
+      margin-top: 16px;
     }
+
     .analytics h2 {
       margin: 0 0 14px;
       font-size: 22px;
     }
+
     .analytics-empty {
       color: #666;
       margin: 0;
     }
+
     .chart {
       display: flex;
       gap: 14px;
@@ -106,6 +215,7 @@
       overflow-x: auto;
       padding-bottom: 8px;
     }
+
     .bar-item {
       min-width: 72px;
       max-width: 96px;
@@ -116,11 +226,13 @@
       gap: 6px;
       flex: 1;
     }
+
     .bar-value {
       font-size: 13px;
       font-weight: 700;
       color: #1e3a8a;
     }
+
     .bar-wrap {
       height: 240px;
       border: 1px solid #dbeafe;
@@ -130,60 +242,92 @@
       padding: 3px;
       background: linear-gradient(180deg, #f8fbff 0%, #eef4ff 100%);
     }
+
     .bar {
       width: 100%;
       border-radius: 6px;
       background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
       transition: height 0.35s ease;
     }
+
     .bar-label {
       font-size: 12px;
       line-height: 1.2;
       color: #334155;
       word-break: break-word;
     }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 860px) {
+      .upload-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-title {
+        font-size: 28px;
+      }
+
+      .submit-btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Обработка Excel-файлов</h1>
-    <p>Загрузите основной Excel-файл (.xlsx или .xls). Файлы &laquo;Локации&raquo; и &laquo;Должность&raquo; можно добавить при необходимости: если их нет, сервис выполнит обработку настолько, насколько это возможно без вспомогательных файлов.</p>
+    <h1 class="page-title">Конвертер КСН</h1>
+    <p class="lead">Загрузите основной Excel-файл (.xlsx или .xls). Файлы &laquo;Локации&raquo; и &laquo;Должность&raquo; можно добавить при необходимости: если их нет, сервис выполнит обработку настолько, насколько это возможно без вспомогательных файлов.</p>
 
     <form id="upload-form">
-      <div class="row">
-        <div class="file-group">
-          <label for="main-file-input">Основной файл:</label>
-          <div class="file-controls">
-            <input id="main-file-input" type="file" accept=".xlsx,.xls" required />
-            <button class="secondary-btn" type="button" onclick="clearFile('main-file-input', 'main-file-name')">Очистить</button>
+      <section class="card upload-card">
+        <div class="upload-grid">
+          <div class="file-group">
+            <p class="file-label">Основной файл</p>
+            <input id="main-file-input" class="file-input" type="file" accept=".xlsx,.xls" required />
+            <div class="file-actions">
+              <button class="btn btn-select" type="button" data-input-id="main-file-input">Выбрать файл</button>
+              <button class="btn btn-clear" type="button" onclick="clearFile('main-file-input', 'main-file-name')">Очистить</button>
+            </div>
+            <span id="main-file-name" class="file-name">Файл не выбран</span>
           </div>
-          <span id="main-file-name" class="file-name">Файл не выбран</span>
-        </div>
 
-        <div class="file-group">
-          <label for="locations-file-input">Файл &laquo;Локации&raquo; (необязательно):</label>
-          <div class="file-controls">
-            <input id="locations-file-input" type="file" accept=".xlsx,.xls" />
-            <button class="secondary-btn" type="button" onclick="clearFile('locations-file-input', 'locations-file-name')">Очистить</button>
+          <div class="file-group">
+            <p class="file-label">Локации</p>
+            <input id="locations-file-input" class="file-input" type="file" accept=".xlsx,.xls" />
+            <div class="file-actions">
+              <button class="btn btn-select" type="button" data-input-id="locations-file-input">Выбрать файл</button>
+              <button class="btn btn-clear" type="button" onclick="clearFile('locations-file-input', 'locations-file-name')">Очистить</button>
+            </div>
+            <span id="locations-file-name" class="file-name">Файл не выбран</span>
           </div>
-          <span id="locations-file-name" class="file-name">Файл не выбран</span>
-        </div>
 
-        <div class="file-group">
-          <label for="barista-file-input">Файл &laquo;Должность&raquo; (необязательно):</label>
-          <div class="file-controls">
-            <input id="barista-file-input" type="file" accept=".xlsx,.xls" />
-            <button class="secondary-btn" type="button" onclick="clearFile('barista-file-input', 'barista-file-name')">Очистить</button>
+          <div class="file-group">
+            <p class="file-label">Должность</p>
+            <input id="barista-file-input" class="file-input" type="file" accept=".xlsx,.xls" />
+            <div class="file-actions">
+              <button class="btn btn-select" type="button" data-input-id="barista-file-input">Выбрать файл</button>
+              <button class="btn btn-clear" type="button" onclick="clearFile('barista-file-input', 'barista-file-name')">Очистить</button>
+            </div>
+            <span id="barista-file-name" class="file-name">Файл не выбран</span>
           </div>
-          <span id="barista-file-name" class="file-name">Файл не выбран</span>
         </div>
+      </section>
 
-        <button id="submit-btn" type="submit">Обработать и скачать</button>
+      <div class="submit-wrap">
+        <button id="submit-btn" class="btn submit-btn" type="submit">
+          <span id="submit-spinner" class="spinner" aria-hidden="true"></span>
+          <span>Обработать и скачать</span>
+        </button>
       </div>
       <div id="status" class="status"></div>
     </form>
 
-    <section id="analytics-section" class="analytics" hidden>
+    <section id="analytics-section" class="card analytics" hidden>
       <h2>Качество по подразделениям</h2>
       <p id="analytics-empty" class="analytics-empty" hidden>Нет данных по подразделениям (пустые значения в столбце D игнорируются).</p>
       <div id="analytics-chart" class="chart"></div>
