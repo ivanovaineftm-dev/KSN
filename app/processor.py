@@ -193,10 +193,11 @@ def _build_department_dictionary(locations_path: Path | None) -> dict[str, str]:
         return {}
 
     result: dict[str, str] = {}
-    for source_value, hr_index_value in locations_df.iloc[:, [0, 1]].itertuples(index=False, name=None):
-        if _is_blank(source_value) or _is_blank(hr_index_value):
+    for value in locations_df.iloc[:, 1]:
+        if _is_blank(value):
             continue
-        result[_normalize_department_key(source_value)] = _normalize_department_display(hr_index_value)
+        display = _normalize_department_display(value)
+        result[_normalize_department_key(value)] = display
     return result
 
 
@@ -205,44 +206,16 @@ def _build_barista_dictionary(barista_path: Path | None) -> dict[str, str]:
         return {}
 
     barista_df = _read_excel_file(barista_path)
-    if barista_df.shape[1] < 2:
+    if barista_df.shape[1] < 3:
         return {}
 
-    employee_column, department_column = _resolve_barista_columns(barista_df)
-
     result: dict[str, str] = {}
-    for row in barista_df.loc[:, [employee_column, department_column]].itertuples(index=False, name=None):
-        search_value, department_value = row
+    for row in barista_df.iloc[:, [1, 2]].itertuples(index=False, name=None):
+        department_value, search_value = row
         if _is_blank(department_value) or _is_blank(search_value):
             continue
         result[_normalize_text(search_value)] = _normalize_department_display(department_value)
     return result
-
-
-def _resolve_barista_columns(barista_df: pd.DataFrame) -> tuple[str | int, str | int]:
-    normalized_column_map = {
-        column: _normalize_text(column) for column in barista_df.columns
-    }
-
-    employee_aliases = {"1", "сотрудник"}
-    department_aliases = {"2", "подразделение"}
-
-    employee_column: str | int | None = None
-    department_column: str | int | None = None
-
-    for column, normalized_name in normalized_column_map.items():
-        if employee_column is None and normalized_name in employee_aliases:
-            employee_column = column
-        if department_column is None and normalized_name in department_aliases:
-            department_column = column
-
-    if employee_column is not None and department_column is not None:
-        return employee_column, department_column
-
-    if barista_df.shape[1] >= 3:
-        return barista_df.columns[2], barista_df.columns[1]
-
-    return barista_df.columns[0], barista_df.columns[1]
 
 
 def _match_department(department_value: object, locations: dict[str, str]) -> str:
@@ -253,28 +226,6 @@ def _match_department(department_value: object, locations: dict[str, str]) -> st
     exact = locations.get(key)
     if exact:
         return exact
-
-    location_keys = list(locations.keys())
-    for location_key in location_keys:
-        if key in location_key or location_key in key:
-            return locations[location_key]
-
-    condensed_key = key.replace(" ", "")
-    for location_key in location_keys:
-        if condensed_key == location_key.replace(" ", ""):
-            return locations[location_key]
-
-    fuzzy = get_close_matches(
-        condensed_key,
-        [item.replace(" ", "") for item in location_keys],
-        n=1,
-        cutoff=0.82,
-    )
-    if fuzzy:
-        matched_condensed_key = fuzzy[0]
-        for location_key in location_keys:
-            if location_key.replace(" ", "") == matched_condensed_key:
-                return locations[location_key]
 
     return NOT_FOUND_LABEL
 
