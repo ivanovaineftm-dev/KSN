@@ -83,13 +83,13 @@ def _contains_excluded_month(value: object) -> bool:
         return False
 
     if isinstance(value, (datetime, date)):
-        return value.month in {2, 3, 5}
+        return value.month == 4
 
     value_text = str(value).strip().lower()
-    if any(month in value_text for month in ("феврал", "март", "май")):
+    if any(month in value_text for month in ("апрел",)):
         return True
 
-    return re.search(r"(?:^|\D)\d{1,2}\.(?:02|03|05)\.\d{4}(?:$|\D)", value_text) is not None
+    return re.search(r"(?:^|\D)\d{1,2}\.(?:04)\.\d{4}(?:$|\D)", value_text) is not None
 
 
 def _contains_target_role(value: object) -> bool:
