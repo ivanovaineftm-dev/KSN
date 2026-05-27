@@ -193,11 +193,12 @@ def _build_department_dictionary(locations_path: Path | None) -> dict[str, str]:
         return {}
 
     result: dict[str, str] = {}
-    for value in locations_df.iloc[:, 1]:
-        if _is_blank(value):
+    for row in locations_df.iloc[:, [0, 1]].itertuples(index=False, name=None):
+        source_department, hr_ind_department = row
+        if _is_blank(source_department) or _is_blank(hr_ind_department):
             continue
-        display = _normalize_department_display(value)
-        result[_normalize_department_key(value)] = display
+        display = _normalize_department_display(hr_ind_department)
+        result[_normalize_department_key(source_department)] = display
     return result
 
 
@@ -226,6 +227,23 @@ def _match_department(department_value: object, locations: dict[str, str]) -> st
     exact = locations.get(key)
     if exact:
         return exact
+
+    location_keys = list(locations.keys())
+    for location_key in location_keys:
+        if key in location_key or location_key in key:
+            return locations[location_key]
+
+    condensed_key = key.replace(" ", "")
+    for location_key in location_keys:
+        if condensed_key == location_key.replace(" ", ""):
+            return locations[location_key]
+
+    fuzzy = get_close_matches(condensed_key, [item.replace(" ", "") for item in location_keys], n=1, cutoff=0.82)
+    if fuzzy:
+        match_key = fuzzy[0]
+        for location_key in location_keys:
+            if location_key.replace(" ", "") == match_key:
+                return locations[location_key]
 
     return NOT_FOUND_LABEL
 
