@@ -207,11 +207,23 @@ def _build_barista_dictionary(barista_path: Path | None) -> dict[str, str]:
         return {}
 
     barista_df = _read_excel_file(barista_path)
-    if barista_df.shape[1] < 3:
+    if barista_df.empty:
+        return {}
+
+    normalized_columns = {_normalize_text(column): column for column in barista_df.columns}
+    employee_column = normalized_columns.get("сотрудник")
+    department_column = normalized_columns.get("подразделение")
+
+    if employee_column is not None and department_column is not None:
+        pairs = barista_df.loc[:, [department_column, employee_column]].itertuples(index=False, name=None)
+    elif barista_df.shape[1] >= 3:
+        # Fallback для шаблона, где B = Подразделение, C = Сотрудник.
+        pairs = barista_df.iloc[:, [1, 2]].itertuples(index=False, name=None)
+    else:
         return {}
 
     result: dict[str, str] = {}
-    for row in barista_df.iloc[:, [1, 2]].itertuples(index=False, name=None):
+    for row in pairs:
         department_value, search_value = row
         if _is_blank(department_value) or _is_blank(search_value):
             continue
