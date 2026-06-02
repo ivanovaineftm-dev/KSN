@@ -7,10 +7,25 @@ const statusNode = document.getElementById('status');
 const analyticsSection = document.getElementById('analytics-section');
 const analyticsEmpty = document.getElementById('analytics-empty');
 const analyticsChart = document.getElementById('analytics-chart');
+const filePickButtons = document.querySelectorAll('[data-input-id]');
 
 function setStatus(message, type = '') {
   statusNode.textContent = message;
   statusNode.className = `status ${type}`.trim();
+}
+
+
+filePickButtons.forEach((button) => {
+  button.addEventListener('click', () => {
+    const inputId = button.getAttribute('data-input-id');
+    const input = document.getElementById(inputId);
+    input?.click();
+  });
+});
+
+function setLoading(isLoading) {
+  submitBtn.disabled = isLoading;
+  submitBtn.classList.toggle('loading', isLoading);
 }
 
 function clearFile(inputId, nameId) {
@@ -102,7 +117,7 @@ form.addEventListener('submit', async (event) => {
     return;
   }
 
-  submitBtn.disabled = true;
+  setLoading(true);
   setStatus('Файл загружается и обрабатывается...');
 
   try {
@@ -134,7 +149,7 @@ form.addEventListener('submit', async (event) => {
   } catch (error) {
     setStatus(error.message || 'Произошла ошибка.', 'error');
   } finally {
-    submitBtn.disabled = false;
+    setLoading(false);
   }
 });
 
